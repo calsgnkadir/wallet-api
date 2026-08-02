@@ -7,6 +7,7 @@ and money transfers with an emphasis on transactional integrity and auditability
 
 - **C# / .NET 10**
 - **ASP.NET Core** — Web API (controller-based)
+- **Entity Framework Core** — ORM, with SQLite for local development
 - **Swagger / OpenAPI** — interactive API documentation
 
 ## Getting Started
@@ -24,6 +25,7 @@ Project skeleton is up and running:
 - [x] Solution + Web API project
 - [x] Swagger UI
 - [x] Health check endpoint (`GET /api/health`)
+- [x] EF Core + SQLite, `User` entity and initial migration
 
 ## Roadmap
 

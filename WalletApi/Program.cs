@@ -1,7 +1,14 @@
+using Microsoft.EntityFrameworkCore;
+using WalletApi.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // --- Servis kayıtları (DI konteyneri) — Spring'in ApplicationContext'i ---
 builder.Services.AddControllers();
+
+// Veritabanı: EF Core + SQLite
+builder.Services.AddDbContext<WalletDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
 
 // Swagger/OpenAPI: API'yi tarayıcıdan görüp test etmeni sağlar (springdoc karşılığı)
 builder.Services.AddEndpointsApiExplorer();
