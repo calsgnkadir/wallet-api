@@ -19,6 +19,10 @@ COPY --from=build /app .
 # Kök kullanıcı olarak çalıştırma: konteyner ele geçirilirse yetkiyi sınırlar.
 USER $APP_UID
 
-EXPOSE 8080
+# Imaj varsayılan olarak 8080 dinler; uygulamayı 8085'e alıyoruz ki
+# konteyner içi ve dışı aynı port olsun.
+ENV ASPNETCORE_HTTP_PORTS=8085
+
+EXPOSE 8085
 
 ENTRYPOINT ["dotnet", "WalletApi.dll"]

@@ -31,8 +31,8 @@ services:
       Jwt__Key: ${JWT_KEY:?JWT_KEY tanimli degil - once .env dosyasi olusturun}
       ASPNETCORE_ENVIRONMENT: Development
     ports:
-      # host:konteyner — dışarıya 8085'ten açılır, konteyner içinde 8080 dinler.
-      - "8085:8080"
+      # host:konteyner — iki tarafta da 8085.
+      - "8085:8085"
 
 volumes:
   wallet-data:
