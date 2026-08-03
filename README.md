@@ -32,16 +32,36 @@ become available.
 
 ## API
 
-| Method | Endpoint             | Auth  | Description                       |
-| ------ | -------------------- | ----- | --------------------------------- |
-| GET    | `/api/health`        | —     | Liveness check                    |
-| POST   | `/api/auth/register` | —     | Create an account                 |
-| POST   | `/api/auth/login`    | —     | Exchange credentials for a JWT    |
-| GET    | `/api/auth/me`       | JWT   | Return the current user's profile |
+| Method | Endpoint                        | Auth | Description                              |
+| ------ | ------------------------------- | ---- | ---------------------------------------- |
+| GET    | `/api/health`                   | —    | Liveness check                           |
+| POST   | `/api/auth/register`            | —    | Create a user and open their wallet      |
+| POST   | `/api/auth/login`               | —    | Exchange credentials for a JWT           |
+| GET    | `/api/auth/me`                  | JWT  | Return the current user's profile        |
+| GET    | `/api/accounts/me`              | JWT  | Return the current user's balance        |
+| POST   | `/api/transactions/deposit`     | JWT  | Add funds                                |
+| POST   | `/api/transactions/withdraw`    | JWT  | Remove funds                             |
+| POST   | `/api/transactions/transfer`    | JWT  | Send funds to another user by email      |
+| GET    | `/api/transactions`             | JWT  | List the current user's transactions     |
+
+## Money Handling
+
+- Balances and amounts use `decimal`, never `double`, so no cent is lost to binary
+  floating-point rounding.
+- A transfer moves both balances and writes both ledger entries inside a single
+  database transaction — it either happens completely or not at all.
+- Accounts carry a concurrency token. If two requests try to spend the same balance
+  at once, the second one fails with `409 Conflict` instead of overwriting the first.
+  A 10-way parallel withdrawal test leaves the balance exactly consistent with the
+  transactions that succeeded, and never negative.
+- Every movement is recorded with the resulting balance, so history is auditable
+  without recomputing it.
 
 ## Security Notes
 
 - Passwords are stored only as PBKDF2 hashes; plaintext is never persisted.
+- Endpoints act on the account resolved from the caller's token, so one user can
+  never read or move another user's money by passing a different id.
 - Login returns the same response whether the account exists or not, and verifies a
   dummy hash when it does not, so response timing cannot be used to enumerate accounts.
 - Email uniqueness is enforced by a database index, not just an application check.
@@ -55,12 +75,14 @@ become available.
 - [x] Health check endpoint (`GET /api/health`)
 - [x] EF Core + SQLite, `User` entity and initial migration
 - [x] Registration, login, and JWT-protected endpoints
+- [x] Accounts — one wallet balance per user
+- [x] Transactions — deposit, withdraw, transfer, and history
+- [x] Concurrency control (optimistic locking) for concurrent withdrawals
 
 ## Roadmap
 
-- [ ] Accounts — wallet balance per user
-- [ ] Transactions — deposit, withdraw, transfer
 - [ ] Audit log — immutable record of every operation
-- [ ] Concurrency control (optimistic locking) for concurrent transfers
+- [ ] Idempotency keys so a retried request cannot pay twice
 - [ ] Unit tests (xUnit)
 - [ ] Docker + docker compose
+- [ ] PostgreSQL instead of SQLite

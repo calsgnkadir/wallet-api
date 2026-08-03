@@ -8,6 +8,8 @@ using Microsoft.OpenApi;
 using WalletApi.Auth;
 using WalletApi.Data;
 using WalletApi.Domain;
+using WalletApi.Infrastructure;
+using WalletApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +22,13 @@ builder.Services.AddDbContext<WalletDbContext>(options =>
 
 // Şifre hash'leme (PBKDF2-HMAC-SHA256, ASP.NET Core'un yerleşik uygulaması)
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
+
+// Cüzdan iş kuralları. Scoped: DbContext gibi istek başına bir örnek yaşar.
+builder.Services.AddScoped<IWalletService, WalletService>();
+
+// İş kuralı hatalarını HTTP durum koduna çeviren tek merkez
+builder.Services.AddExceptionHandler<WalletExceptionHandler>();
+builder.Services.AddProblemDetails();
 
 // JWT ayarları + token üreten servis
 builder.Services.Configure<JwtSettings>(
@@ -91,6 +100,9 @@ builder.Services.AddSwaggerGen(options =>
 var app = builder.Build();
 
 // --- HTTP pipeline (middleware zinciri) — Spring'in Filter zinciri ---
+// En başta: aşağıdaki hiçbir katmandan işlenmemiş hata sızmasın.
+app.UseExceptionHandler();
+
 // Swagger UI'ı yalnızca geliştirme ortamında aç
 if (app.Environment.IsDevelopment())
 {

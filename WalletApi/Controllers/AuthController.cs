@@ -50,7 +50,11 @@ public class AuthController : ControllerBase
         };
         user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
 
+        // Kullanıcı ve cüzdan hesabı tek SaveChanges ile, yani tek işlemde yazılır:
+        // hesabı olmayan bir kullanıcı kaydı oluşamaz.
         _db.Users.Add(user);
+        _db.Accounts.Add(new Account { UserId = user.Id });
+
         await _db.SaveChangesAsync();
 
         var response = ToResponse(user);
