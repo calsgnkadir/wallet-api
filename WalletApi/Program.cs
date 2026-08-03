@@ -2,8 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
 using WalletApi.Auth;
 using WalletApi.Data;
@@ -30,49 +29,27 @@ builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddExceptionHandler<WalletExceptionHandler>();
 builder.Services.AddProblemDetails();
 
-// JWT ayarları + token üreten servis
-builder.Services.Configure<JwtSettings>(
-    builder.Configuration.GetSection(JwtSettings.SectionName));
-builder.Services.AddSingleton<ITokenService, TokenService>();
-
-var jwtSettings = builder.Configuration
-    .GetSection(JwtSettings.SectionName)
-    .Get<JwtSettings>() ?? new JwtSettings();
-
+// JWT ayarları + token üreten servis.
 // İmzalama anahtarı yoksa uygulama hiç başlamasın: eksik yapılandırmayla
 // çalışan bir kimlik doğrulama, olmayandan daha tehlikelidir.
-if (Encoding.UTF8.GetByteCount(jwtSettings.Key) < 32)
-{
-    throw new InvalidOperationException(
+builder.Services
+    .AddOptions<JwtSettings>()
+    .Bind(builder.Configuration.GetSection(JwtSettings.SectionName))
+    .Validate(
+        settings => Encoding.UTF8.GetByteCount(settings.Key) >= 32,
         "Jwt:Key eksik veya çok kısa (en az 32 bayt olmalı). " +
-        "Geliştirme için: dotnet user-secrets set \"Jwt:Key\" \"<uzun-rastgele-deger>\"");
-}
+        "Geliştirme için: dotnet user-secrets set \"Jwt:Key\" \"<uzun-rastgele-deger>\"")
+    .ValidateOnStart();
+
+builder.Services.AddSingleton<ITokenService, TokenService>();
+
+// Doğrulama parametreleri de aynı JwtSettings'ten kurulur; token'ı imzalayan
+// ve doğrulayan taraf böylece tek kaynaktan beslenir.
+builder.Services.AddSingleton<IConfigureOptions<JwtBearerOptions>, ConfigureJwtBearerOptions>();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        // Varsayılan davranış claim adlarını uzun URI'lere çevirir ("sub" ->
-        // ".../nameidentifier"). Kapatıyoruz: token'daki adlar neyse o kalsın.
-        options.MapInboundClaims = false;
-
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtSettings.Issuer,
-            ValidAudience = jwtSettings.Audience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Key)),
-
-            // Süresi dolan token varsayılan olarak 5 dakika daha kabul edilir; kapatıyoruz.
-            ClockSkew = TimeSpan.Zero,
-
-            NameClaimType = JwtRegisteredClaimNames.Sub,
-            RoleClaimType = TokenService.RoleClaimType
-        };
-    });
+    .AddJwtBearer();
 
 builder.Services.AddAuthorization();
 
@@ -119,3 +96,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Üst düzey deyimlerle yazılan Program sınıfı varsayılan olarak internal'dır;
+// entegrasyon testlerinin uygulamayı ayağa kaldırabilmesi için görünür kılıyoruz.
+public partial class Program;

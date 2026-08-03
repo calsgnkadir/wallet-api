@@ -44,6 +44,20 @@ become available.
 | POST   | `/api/transactions/transfer`    | JWT  | Send funds to another user by email      |
 | GET    | `/api/transactions`             | JWT  | List the current user's transactions     |
 
+## Tests
+
+```bash
+dotnet test
+```
+
+34 tests, no external dependencies — each one runs against its own in-memory SQLite
+database, so the suite is deterministic and safe to run in parallel.
+
+- **Service tests** cover the money rules directly: rounding, overdraft rejection,
+  transfer atomicity, ledger-versus-balance consistency, and the concurrency guard.
+- **Endpoint tests** boot the whole application in memory and drive it over HTTP with
+  real JWTs, covering registration, login, authorization and the full transfer flow.
+
 ## Money Handling
 
 - Balances and amounts use `decimal`, never `double`, so no cent is lost to binary
@@ -78,11 +92,11 @@ become available.
 - [x] Accounts — one wallet balance per user
 - [x] Transactions — deposit, withdraw, transfer, and history
 - [x] Concurrency control (optimistic locking) for concurrent withdrawals
+- [x] Unit and integration tests (xUnit)
 
 ## Roadmap
 
 - [ ] Audit log — immutable record of every operation
 - [ ] Idempotency keys so a retried request cannot pay twice
-- [ ] Unit tests (xUnit)
 - [ ] Docker + docker compose
 - [ ] PostgreSQL instead of SQLite
