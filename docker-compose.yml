@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: wallet
+      POSTGRES_USER: wallet
+      # Yerel geliştirme parolası; dışarı açılmaz ve üretimde kullanılmaz.
+      POSTGRES_PASSWORD: wallet
+    volumes:
+      - wallet-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wallet -d wallet"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        # Veritabanı hazır olmadan API başlamasın.
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=wallet;Username=wallet;Password=wallet"
+      Database__MigrateOnStartup: "true"
+      Jwt__Issuer: WalletApi
+      Jwt__Audience: WalletApi
+      # İmzalama anahtarı repoda tutulmaz; ortamdan ya da .env dosyasından gelir.
+      Jwt__Key: ${JWT_KEY:?JWT_KEY tanimli degil - once .env dosyasi olusturun}
+      ASPNETCORE_ENVIRONMENT: Development
+    ports:
+      - "8080:8080"
+
+volumes:
+  wallet-data:

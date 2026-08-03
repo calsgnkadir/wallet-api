@@ -20,8 +20,12 @@ public class WalletDbContext : DbContext
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
-        // Tüm DateTimeOffset alanları için tek noktadan dönüşüm kuralı.
-        configurationBuilder.Properties<DateTimeOffset>().HaveConversion<UtcTicksConverter>();
+        // PostgreSQL DateTimeOffset'i (timestamptz) yerel olarak destekler; dönüşüm
+        // yalnızca bu tipi tanımayan SQLite için gerekli (testler onu kullanır).
+        if (Database.IsSqlite())
+        {
+            configurationBuilder.Properties<DateTimeOffset>().HaveConversion<UtcTicksConverter>();
+        }
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+.git/
+.gitignore
+*.db
+*.db-shm
+*.db-wal
+*.md
+docker-compose*.yml
+Dockerfile
+.dockerignore
+WalletApi.Tests/

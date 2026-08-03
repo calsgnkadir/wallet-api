@@ -15,9 +15,9 @@ var builder = WebApplication.CreateBuilder(args);
 // --- Servis kayıtları (DI konteyneri) — Spring'in ApplicationContext'i ---
 builder.Services.AddControllers();
 
-// Veritabanı: EF Core + SQLite
+// Veritabanı: EF Core + PostgreSQL (docker compose ile birlikte gelir)
 builder.Services.AddDbContext<WalletDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("Default")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
 // Şifre hash'leme (PBKDF2-HMAC-SHA256, ASP.NET Core'un yerleşik uygulaması)
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -75,6 +75,15 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// Şema göçünü uygulama başlarken çalıştırmak konteyner kurulumunu kolaylaştırır,
+// ama birden fazla örnek aynı anda başlarsa yarışa girer. Bu yüzden varsayılan
+// kapalı; docker compose tek örnek başlattığı için orada açıyoruz.
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    await scope.ServiceProvider.GetRequiredService<WalletDbContext>().Database.MigrateAsync();
+}
 
 // --- HTTP pipeline (middleware zinciri) — Spring'in Filter zinciri ---
 // En başta: aşağıdaki hiçbir katmandan işlenmemiş hata sızmasın.

@@ -7,28 +7,48 @@ and money transfers with an emphasis on transactional integrity and auditability
 
 - **C# / .NET 10**
 - **ASP.NET Core** — Web API (controller-based)
-- **Entity Framework Core** — ORM, with SQLite for local development
+- **Entity Framework Core** — ORM over **PostgreSQL**
 - **JWT Bearer authentication** — stateless auth with role-based authorization
+- **Docker Compose** — API and database start together
 - **Swagger / OpenAPI** — interactive API documentation
 
 ## Getting Started
 
-The JWT signing key is a secret and is deliberately not stored in the repository.
-Provide one before the first run — the app refuses to start without it:
+The JWT signing key is a secret and is deliberately not in the repository. Copy the
+example environment file and put your own random key in it:
+
+```bash
+cp .env.example .env
+```
+
+Then start the API and PostgreSQL together:
+
+```bash
+docker compose up --build
+```
+
+Open <http://localhost:8080/swagger>. Register through `POST /api/auth/register`, call
+`POST /api/auth/login`, paste the returned token into the **Authorize** dialog, and the
+protected endpoints become available.
+
+### Running without Docker
+
+You need a PostgreSQL instance reachable at the connection string in
+`appsettings.json`, then:
 
 ```bash
 dotnet user-secrets set "Jwt:Key" "<a-random-string-of-at-least-32-bytes>" --project WalletApi
 ```
 
-Then run the API:
+```bash
+dotnet ef database update --project WalletApi
+```
 
 ```bash
 dotnet run --project WalletApi
 ```
 
-Open <http://localhost:5139/swagger> to explore the API. Call `POST /api/auth/login`,
-copy the returned token into the **Authorize** dialog, and the protected endpoints
-become available.
+The app refuses to start when the signing key is missing or shorter than 32 bytes.
 
 ## API
 
@@ -50,8 +70,8 @@ become available.
 dotnet test
 ```
 
-34 tests, no external dependencies — each one runs against its own in-memory SQLite
-database, so the suite is deterministic and safe to run in parallel.
+34 tests, no external dependencies — the suite swaps PostgreSQL for an in-memory SQLite
+database, so it is deterministic, runs in parallel, and needs no Docker.
 
 - **Service tests** cover the money rules directly: rounding, overdraft rejection,
   transfer atomicity, ledger-versus-balance consistency, and the concurrency guard.
@@ -81,6 +101,9 @@ database, so the suite is deterministic and safe to run in parallel.
 - Email uniqueness is enforced by a database index, not just an application check.
 - User ids are GUIDs rather than sequential integers, so records cannot be enumerated.
 - Dependencies are checked with `dotnet list package --vulnerable --include-transitive`.
+- The container runs as a non-root user and ships only the runtime — no SDK, no sources.
+- The signing key reaches the container through the environment, never through an image
+  layer or a committed file.
 
 ## Current Status
 
@@ -93,10 +116,9 @@ database, so the suite is deterministic and safe to run in parallel.
 - [x] Transactions — deposit, withdraw, transfer, and history
 - [x] Concurrency control (optimistic locking) for concurrent withdrawals
 - [x] Unit and integration tests (xUnit)
+- [x] PostgreSQL and Docker Compose
 
 ## Roadmap
 
 - [ ] Audit log — immutable record of every operation
 - [ ] Idempotency keys so a retried request cannot pay twice
-- [ ] Docker + docker compose
-- [ ] PostgreSQL instead of SQLite
