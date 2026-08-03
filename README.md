@@ -27,7 +27,7 @@ Then start the API and PostgreSQL together:
 docker compose up --build
 ```
 
-Open <http://localhost:8080/swagger>. Register through `POST /api/auth/register`, call
+Open <http://localhost:8085/swagger>. Register through `POST /api/auth/register`, call
 `POST /api/auth/login`, paste the returned token into the **Authorize** dialog, and the
 protected endpoints become available.
 
