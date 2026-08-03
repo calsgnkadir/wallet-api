@@ -7,7 +7,9 @@ services:
       # Yerel geliştirme parolası; dışarı açılmaz ve üretimde kullanılmaz.
       POSTGRES_PASSWORD: wallet
     volumes:
-      - wallet-data:/var/lib/postgresql/data
+      # PostgreSQL 18+ verisini bu dizinin altında sürüm adlı bir klasörde tutar;
+      # bağlama noktası "data" değil, bir üstü olmalıdır.
+      - wallet-data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U wallet -d wallet"]
       interval: 5s

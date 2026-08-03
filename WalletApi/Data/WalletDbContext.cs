@@ -6,6 +6,8 @@ namespace WalletApi.Data;
 
 public class WalletDbContext : DbContext
 {
+    private const string SqliteProviderName = "Microsoft.EntityFrameworkCore.Sqlite";
+
     public WalletDbContext(DbContextOptions<WalletDbContext> options)
         : base(options)
     {
@@ -22,7 +24,9 @@ public class WalletDbContext : DbContext
     {
         // PostgreSQL DateTimeOffset'i (timestamptz) yerel olarak destekler; dönüşüm
         // yalnızca bu tipi tanımayan SQLite için gerekli (testler onu kullanır).
-        if (Database.IsSqlite())
+        // Sağlayıcıyı adıyla kontrol ediyoruz ki üretim projesi SQLite paketine
+        // bağımlı olmasın ve o sürücü imaja hiç girmesin.
+        if (Database.ProviderName == SqliteProviderName)
         {
             configurationBuilder.Properties<DateTimeOffset>().HaveConversion<UtcTicksConverter>();
         }
