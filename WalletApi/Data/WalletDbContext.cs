@@ -22,6 +22,8 @@ public class WalletDbContext : DbContext
 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         // PostgreSQL DateTimeOffset'i (timestamptz) yerel olarak destekler; dönüşüm
@@ -119,6 +121,23 @@ public class WalletDbContext : DbContext
             // istekten yalnızca biri kaydı oluşturabilir; yarışı veritabanı çözer.
             record.HasIndex(r => new { r.UserId, r.Key }).IsUnique();
         });
+
+        modelBuilder.Entity<AuditEvent>(auditEvent =>
+        {
+            auditEvent.HasKey(e => e.Id);
+
+            auditEvent.Property(e => e.Action).HasConversion<string>().HasMaxLength(30);
+            auditEvent.Property(e => e.Outcome).HasConversion<string>().HasMaxLength(10);
+            auditEvent.Property(e => e.Amount).HasPrecision(18, 2);
+            auditEvent.Property(e => e.IpAddress).HasMaxLength(45);
+            auditEvent.Property(e => e.UserAgent).HasMaxLength(512);
+            auditEvent.Property(e => e.Details).HasMaxLength(512);
+
+            // Denetim en çok "şu kullanıcı ne yaptı" ve "şu tarihte ne oldu"
+            // sorularıyla okunur.
+            auditEvent.HasIndex(e => e.OccurredAt);
+            auditEvent.HasIndex(e => new { e.UserId, e.OccurredAt });
+        });
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -130,6 +149,18 @@ public class WalletDbContext : DbContext
             if (entry.State == EntityState.Modified)
             {
                 entry.Entity.RowVersion = Guid.NewGuid();
+            }
+        }
+
+        // Denetim kaydı yalnızca eklenebilir. Uygulamanın herhangi bir yerindeki
+        // bir hata bile geçmişi düzeltemesin diye burada durduruyoruz;
+        // veritabanı tarafında ayrıca bir tetikleyici aynı kuralı uygular.
+        foreach (var entry in ChangeTracker.Entries<AuditEvent>())
+        {
+            if (entry.State is EntityState.Modified or EntityState.Deleted)
+            {
+                throw new InvalidOperationException(
+                    "Denetim kayıtları değiştirilemez veya silinemez.");
             }
         }
 

@@ -32,6 +32,10 @@ builder.Services.AddProblemDetails();
 // Tekrarlanan para isteklerini yakalayan filtre. Scoped: DbContext kullanır.
 builder.Services.AddScoped<IdempotencyFilter>();
 
+// Denetim kaydı. İstek bilgisi (IP, tarayıcı) için HttpContext erişimi gerekir.
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IAuditLogger, AuditLogger>();
+
 // JWT ayarları + token üreten servis.
 // İmzalama anahtarı yoksa uygulama hiç başlamasın: eksik yapılandırmayla
 // çalışan bir kimlik doğrulama, olmayandan daha tehlikelidir.
@@ -86,6 +90,9 @@ if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider.GetRequiredService<WalletDbContext>().Database.MigrateAsync();
+
+    // Şema hazır olduktan sonra: yapılandırmada tanımlıysa yönetici hesabı.
+    await AdminSeeder.SeedAsync(scope.ServiceProvider, app.Configuration, app.Logger);
 }
 
 // --- HTTP pipeline (middleware zinciri) — Spring'in Filter zinciri ---

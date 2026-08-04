@@ -8,6 +8,7 @@ using WalletApi.Auth;
 using WalletApi.Contracts;
 using WalletApi.Data;
 using WalletApi.Domain;
+using WalletApi.Services;
 
 namespace WalletApi.Controllers;
 
@@ -18,15 +19,18 @@ public class AuthController : ControllerBase
     private readonly WalletDbContext _db;
     private readonly ITokenService _tokenService;
     private readonly IPasswordHasher<User> _passwordHasher;
+    private readonly IAuditLogger _audit;
 
     public AuthController(
         WalletDbContext db,
         ITokenService tokenService,
-        IPasswordHasher<User> passwordHasher)
+        IPasswordHasher<User> passwordHasher,
+        IAuditLogger audit)
     {
         _db = db;
         _tokenService = tokenService;
         _passwordHasher = passwordHasher;
+        _audit = audit;
     }
 
     // POST /api/auth/register
@@ -54,6 +58,7 @@ public class AuthController : ControllerBase
         // hesabı olmayan bir kullanıcı kaydı oluşamaz.
         _db.Users.Add(user);
         _db.Accounts.Add(new Account { UserId = user.Id });
+        _audit.Record(AuditAction.UserRegistered, AuditOutcome.Success, user.Id);
 
         await _db.SaveChangesAsync();
 
@@ -79,14 +84,14 @@ public class AuthController : ControllerBase
                 DummyHash,
                 request.Password);
 
-            return InvalidCredentials();
+            return await FailedLoginAsync(null, $"Bilinmeyen e-posta: {email}");
         }
 
         var result = _passwordHasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
 
         if (result == PasswordVerificationResult.Failed)
         {
-            return InvalidCredentials();
+            return await FailedLoginAsync(user.Id, "Hatalı şifre.");
         }
 
         // Hash algoritması güncellendiyse şifreyi sessizce yeni formata taşı.
@@ -95,6 +100,9 @@ public class AuthController : ControllerBase
             user.PasswordHash = _passwordHasher.HashPassword(user, request.Password);
             await _db.SaveChangesAsync();
         }
+
+        _audit.Record(AuditAction.LoginSucceeded, AuditOutcome.Success, user.Id);
+        await _db.SaveChangesAsync();
 
         var (token, expiresAt) = _tokenService.CreateToken(user);
         return Ok(new AuthResponse(token, expiresAt));
@@ -118,6 +126,16 @@ public class AuthController : ControllerBase
 
         // Token geçerli ama kullanıcı silinmiş olabilir.
         return user is null ? Unauthorized() : Ok(ToResponse(user));
+    }
+
+    // Başarısız giriş denemeleri kayda geçer: saldırı tespitinin dayanağı budur.
+    // Yanıt her iki durumda da aynıdır; ayrım yalnızca denetim kaydında kalır.
+    private async Task<ActionResult<AuthResponse>> FailedLoginAsync(Guid? userId, string reason)
+    {
+        _audit.Record(AuditAction.LoginFailed, AuditOutcome.Failure, userId, details: reason);
+        await _db.SaveChangesAsync();
+
+        return InvalidCredentials();
     }
 
     // Kullanıcının var olup olmadığını ele vermemek için tek ve aynı mesaj.

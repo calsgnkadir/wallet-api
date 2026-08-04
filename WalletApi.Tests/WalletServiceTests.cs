@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using WalletApi.Data;
 using WalletApi.Domain;
 using WalletApi.Services;
 
@@ -10,13 +12,18 @@ public class WalletServiceTests : IDisposable
 
     public void Dispose() => _db.Dispose();
 
+    // Denetim kaydı gerçek uygulamasıyla çalışır; HttpContext olmadığı için
+    // IP ve tarayıcı alanları boş kalır, kaydın kendisi yine de yazılır.
+    private static WalletService CreateService(WalletDbContext context) =>
+        new(context, new AuditLogger(context, new HttpContextAccessor()));
+
     [Fact]
     public async Task Deposit_ArtirirBakiyeyi()
     {
         var (userId, _) = await _db.AddUserWithAccountAsync("ayse@test.com");
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         await service.DepositAsync(userId, 1000m, "ilk yatirma");
 
@@ -30,7 +37,7 @@ public class WalletServiceTests : IDisposable
         var (userId, _) = await _db.AddUserWithAccountAsync("ayse@test.com", 250m);
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         var transaction = await service.DepositAsync(userId, 100m, null);
 
@@ -48,7 +55,7 @@ public class WalletServiceTests : IDisposable
         var (userId, _) = await _db.AddUserWithAccountAsync("ayse@test.com");
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         var exception = await Assert.ThrowsAsync<WalletException>(
             () => service.DepositAsync(userId, amount, null));
@@ -62,7 +69,7 @@ public class WalletServiceTests : IDisposable
         var (userId, _) = await _db.AddUserWithAccountAsync("ayse@test.com");
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         await service.DepositAsync(userId, 10.126m, null);
 
@@ -76,7 +83,7 @@ public class WalletServiceTests : IDisposable
         var (userId, _) = await _db.AddUserWithAccountAsync("ayse@test.com", 500m);
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         await service.WithdrawAsync(userId, 250.50m, null);
 
@@ -90,7 +97,7 @@ public class WalletServiceTests : IDisposable
         var (userId, _) = await _db.AddUserWithAccountAsync("ayse@test.com", 100m);
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         var exception = await Assert.ThrowsAsync<WalletException>(
             () => service.WithdrawAsync(userId, 100.01m, null));
@@ -98,7 +105,7 @@ public class WalletServiceTests : IDisposable
         Assert.Equal(WalletErrorCode.InsufficientFunds, exception.Code);
 
         await using var freshContext = _db.CreateContext();
-        var account = await new WalletService(freshContext).GetAccountAsync(userId);
+        var account = await CreateService(freshContext).GetAccountAsync(userId);
         Assert.Equal(100m, account.Balance);
     }
 
@@ -108,7 +115,7 @@ public class WalletServiceTests : IDisposable
         var (userId, _) = await _db.AddUserWithAccountAsync("ayse@test.com", 100m);
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         await service.WithdrawAsync(userId, 100m, null);
 
@@ -123,7 +130,7 @@ public class WalletServiceTests : IDisposable
         await _db.AddUserWithAccountAsync("mehmet@test.com", 50m);
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         await service.TransferAsync(ayse, "mehmet@test.com", 300m, "kira");
 
@@ -141,7 +148,7 @@ public class WalletServiceTests : IDisposable
         var (_, mehmetAccount) = await _db.AddUserWithAccountAsync("mehmet@test.com");
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         var outgoing = await service.TransferAsync(ayse, "mehmet@test.com", 300m, "kira");
 
@@ -163,7 +170,7 @@ public class WalletServiceTests : IDisposable
         await _db.AddUserWithAccountAsync("mehmet@test.com", 50m);
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         await Assert.ThrowsAsync<WalletException>(
             () => service.TransferAsync(ayse, "mehmet@test.com", 500m, null));
@@ -182,7 +189,7 @@ public class WalletServiceTests : IDisposable
         var (ayse, _) = await _db.AddUserWithAccountAsync("ayse@test.com", 500m);
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         var exception = await Assert.ThrowsAsync<WalletException>(
             () => service.TransferAsync(ayse, "ayse@test.com", 100m, null));
@@ -196,7 +203,7 @@ public class WalletServiceTests : IDisposable
         var (ayse, _) = await _db.AddUserWithAccountAsync("ayse@test.com", 500m);
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         var exception = await Assert.ThrowsAsync<WalletException>(
             () => service.TransferAsync(ayse, "yok@test.com", 100m, null));
@@ -211,7 +218,7 @@ public class WalletServiceTests : IDisposable
         await _db.AddUserWithAccountAsync("mehmet@test.com");
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         await service.TransferAsync(ayse, "  MEHMET@Test.COM  ", 100m, null);
 
@@ -228,7 +235,7 @@ public class WalletServiceTests : IDisposable
         var (userId, _) = await _db.AddUserWithAccountAsync("ayse@test.com");
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         await service.DepositAsync(userId, 100m, "birinci");
         await service.DepositAsync(userId, 200m, "ikinci");
@@ -246,7 +253,7 @@ public class WalletServiceTests : IDisposable
         var (mehmet, _) = await _db.AddUserWithAccountAsync("mehmet@test.com");
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         await service.TransferAsync(ayse, "mehmet@test.com", 100m, "transfer");
 
@@ -264,8 +271,8 @@ public class WalletServiceTests : IDisposable
 
         await using var contextA = _db.CreateContext();
         await using var contextB = _db.CreateContext();
-        var serviceA = new WalletService(contextA);
-        var serviceB = new WalletService(contextB);
+        var serviceA = CreateService(contextA);
+        var serviceB = CreateService(contextB);
 
         // İki istek de hesabı aynı anda okur: ikisi de 500 TL görür.
         await serviceA.GetAccountAsync(userId);
@@ -280,7 +287,7 @@ public class WalletServiceTests : IDisposable
 
         // Bakiye yalnızca ilk çekimi yansıtmalı; eksiye düşmemeli.
         await using var freshContext = _db.CreateContext();
-        var account = await new WalletService(freshContext).GetAccountAsync(userId);
+        var account = await CreateService(freshContext).GetAccountAsync(userId);
 
         Assert.Equal(100m, account.Balance);
     }
@@ -292,7 +299,7 @@ public class WalletServiceTests : IDisposable
         await _db.AddUserWithAccountAsync("mehmet@test.com");
 
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         await service.DepositAsync(ayse, 1000m, null);
         await service.WithdrawAsync(ayse, 250.50m, null);
@@ -316,7 +323,7 @@ public class WalletServiceTests : IDisposable
     public async Task Hesap_BulunamazsaAnlamliHataDoner()
     {
         await using var context = _db.CreateContext();
-        var service = new WalletService(context);
+        var service = CreateService(context);
 
         var exception = await Assert.ThrowsAsync<WalletException>(
             () => service.GetAccountAsync(Guid.NewGuid()));

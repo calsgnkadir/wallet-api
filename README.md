@@ -63,6 +63,7 @@ The app refuses to start when the signing key is missing or shorter than 32 byte
 | POST   | `/api/transactions/withdraw`    | JWT  | Remove funds — accepts `Idempotency-Key` |
 | POST   | `/api/transactions/transfer`    | JWT  | Transfer by email — accepts `Idempotency-Key` |
 | GET    | `/api/transactions`             | JWT  | List the current user's transactions     |
+| GET    | `/api/audit`                    | Admin | Read the audit trail                    |
 
 ## Tests
 
@@ -70,13 +71,30 @@ The app refuses to start when the signing key is missing or shorter than 32 byte
 dotnet test
 ```
 
-45 tests, no external dependencies — the suite swaps PostgreSQL for an in-memory SQLite
+56 tests, no external dependencies — the suite swaps PostgreSQL for an in-memory SQLite
 database, so it is deterministic, runs in parallel, and needs no Docker.
 
 - **Service tests** cover the money rules directly: rounding, overdraft rejection,
   transfer atomicity, ledger-versus-balance consistency, and the concurrency guard.
 - **Endpoint tests** boot the whole application in memory and drive it over HTTP with
   real JWTs, covering registration, login, authorization and the full transfer flow.
+
+## Audit Trail
+
+Every registration, login attempt and money movement is written to an append-only
+`AuditEvents` table with the actor, amount, IP address and user agent — including the
+attempts that were rejected, since a run of failed logins is exactly what an
+investigation looks for.
+
+- Money events are written in the same transaction as the movement itself, so a
+  transfer cannot succeed without leaving a record.
+- The log is immutable in two places: the `DbContext` refuses to save a modified or
+  deleted audit row, and a PostgreSQL trigger raises an exception on `UPDATE` or
+  `DELETE`. The second one holds even against a client connecting directly to the
+  database.
+- Reading it requires the `Admin` role — the records contain other users' activity.
+  Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env` to have an administrator created
+  on first start; leave them empty and none is created.
 
 ## Idempotency
 
@@ -127,13 +145,15 @@ curl -X POST http://localhost:8085/api/transactions/transfer \
 - The container runs as a non-root user and ships only the runtime — no SDK, no sources.
 - The signing key reaches the container through the environment, never through an image
   layer or a committed file.
+- Failed logins are recorded with their IP address, and the audit trail cannot be
+  rewritten from the application or from a direct database connection.
 
 ## Current Status
 
 - [x] Solution + Web API project
 - [x] Swagger UI
 - [x] Health check endpoint (`GET /api/health`)
-- [x] EF Core + SQLite, `User` entity and initial migration
+- [x] EF Core data layer with migrations
 - [x] Registration, login, and JWT-protected endpoints
 - [x] Accounts — one wallet balance per user
 - [x] Transactions — deposit, withdraw, transfer, and history
@@ -141,7 +161,5 @@ curl -X POST http://localhost:8085/api/transactions/transfer \
 - [x] Unit and integration tests (xUnit)
 - [x] PostgreSQL and Docker Compose
 - [x] Idempotency keys so a retried request cannot pay twice
+- [x] Append-only audit trail with admin-only access
 
-## Roadmap
-
-- [ ] Audit log — immutable record of every operation

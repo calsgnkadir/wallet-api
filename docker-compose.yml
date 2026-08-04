@@ -29,6 +29,10 @@ services:
       Jwt__Audience: WalletApi
       # İmzalama anahtarı repoda tutulmaz; ortamdan ya da .env dosyasından gelir.
       Jwt__Key: ${JWT_KEY:?JWT_KEY tanimli degil - once .env dosyasi olusturun}
+      # İsteğe bağlı: denetim kaydını okuyabilecek ilk yönetici hesabı.
+      # Boş bırakılırsa yönetici oluşturulmaz.
+      Seed__AdminEmail: ${ADMIN_EMAIL:-}
+      Seed__AdminPassword: ${ADMIN_PASSWORD:-}
       ASPNETCORE_ENVIRONMENT: Development
     ports:
       # host:konteyner — iki tarafta da 8085.
