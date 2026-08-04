@@ -19,12 +19,19 @@ namespace WalletApi.Tests;
 // paket kurulu bir veritabanı sunucusu olmadan da "dotnet test" çalışır.
 public class WalletApiFactory : WebApplicationFactory<Program>
 {
-    // Bağlantı kapanınca bellek içi veritabanı silinir; bunu açık tutuyoruz.
-    private readonly SqliteConnection _connection = new("DataSource=:memory:");
+    // Paylaşımlı bellek içi veritabanı: her DbContext kendi bağlantısını açar.
+    // Tek bir bağlantı nesnesini paylaşmak, eşzamanlı isteklerde SQLite'ı
+    // güvensiz biçimde birden çok iş parçacığından kullanmak olurdu.
+    private readonly string _connectionString =
+        $"DataSource=file:{Guid.NewGuid():N}?mode=memory&cache=shared";
+
+    // Son bağlantı kapanınca bellek içi veritabanı silinir; birini açık tutuyoruz.
+    private SqliteConnection? _keepAlive;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        _connection.Open();
+        _keepAlive = new SqliteConnection(_connectionString);
+        _keepAlive.Open();
 
         builder.UseEnvironment("Development");
 
@@ -48,7 +55,7 @@ public class WalletApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<IDbContextOptionsConfiguration<WalletDbContext>>();
             services.RemoveAll<WalletDbContext>();
 
-            services.AddDbContext<WalletDbContext>(options => options.UseSqlite(_connection));
+            services.AddDbContext<WalletDbContext>(options => options.UseSqlite(_connectionString));
         });
     }
 
@@ -68,7 +75,7 @@ public class WalletApiFactory : WebApplicationFactory<Program>
 
         if (disposing)
         {
-            _connection.Dispose();
+            _keepAlive?.Dispose();
         }
     }
 }

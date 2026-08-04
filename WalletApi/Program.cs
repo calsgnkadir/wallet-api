@@ -29,6 +29,9 @@ builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddExceptionHandler<WalletExceptionHandler>();
 builder.Services.AddProblemDetails();
 
+// Tekrarlanan para isteklerini yakalayan filtre. Scoped: DbContext kullanır.
+builder.Services.AddScoped<IdempotencyFilter>();
+
 // JWT ayarları + token üreten servis.
 // İmzalama anahtarı yoksa uygulama hiç başlamasın: eksik yapılandırmayla
 // çalışan bir kimlik doğrulama, olmayandan daha tehlikelidir.

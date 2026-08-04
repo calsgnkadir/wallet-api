@@ -1,4 +1,4 @@
-# WalletApi
+﻿# WalletApi
 
 A secure digital wallet REST API built with ASP.NET Core — user accounts, balances,
 and money transfers with an emphasis on transactional integrity and auditability.
@@ -59,9 +59,9 @@ The app refuses to start when the signing key is missing or shorter than 32 byte
 | POST   | `/api/auth/login`               | —    | Exchange credentials for a JWT           |
 | GET    | `/api/auth/me`                  | JWT  | Return the current user's profile        |
 | GET    | `/api/accounts/me`              | JWT  | Return the current user's balance        |
-| POST   | `/api/transactions/deposit`     | JWT  | Add funds                                |
-| POST   | `/api/transactions/withdraw`    | JWT  | Remove funds                             |
-| POST   | `/api/transactions/transfer`    | JWT  | Send funds to another user by email      |
+| POST   | `/api/transactions/deposit`     | JWT  | Add funds — accepts `Idempotency-Key`    |
+| POST   | `/api/transactions/withdraw`    | JWT  | Remove funds — accepts `Idempotency-Key` |
+| POST   | `/api/transactions/transfer`    | JWT  | Transfer by email — accepts `Idempotency-Key` |
 | GET    | `/api/transactions`             | JWT  | List the current user's transactions     |
 
 ## Tests
@@ -70,13 +70,36 @@ The app refuses to start when the signing key is missing or shorter than 32 byte
 dotnet test
 ```
 
-34 tests, no external dependencies — the suite swaps PostgreSQL for an in-memory SQLite
+45 tests, no external dependencies — the suite swaps PostgreSQL for an in-memory SQLite
 database, so it is deterministic, runs in parallel, and needs no Docker.
 
 - **Service tests** cover the money rules directly: rounding, overdraft rejection,
   transfer atomicity, ledger-versus-balance consistency, and the concurrency guard.
 - **Endpoint tests** boot the whole application in memory and drive it over HTTP with
   real JWTs, covering registration, login, authorization and the full transfer flow.
+
+## Idempotency
+
+A client whose connection drops mid-request cannot tell whether the money moved, so it
+retries — and naively that pays twice. The three money endpoints accept an optional
+`Idempotency-Key` header:
+
+```bash
+curl -X POST http://localhost:8085/api/transactions/transfer \
+  -H "Authorization: Bearer <token>" \
+  -H "Idempotency-Key: 7f3c1e0a-..." \
+  -H "Content-Type: application/json" \
+  -d '{"toEmail":"someone@example.com","amount":100}'
+```
+
+- Repeating the request with the same key replays the original response — same
+  transaction id, no second movement — and marks it with `Idempotency-Replayed: true`.
+- The key is reserved through a unique index before the work starts, so concurrent
+  retries cannot both execute. Ten parallel requests sharing one key move the money once.
+- Reusing a key for a different amount or a different endpoint is rejected with `409`
+  rather than silently replaying, since that would swallow a genuine second request.
+- A request that fails releases its key, so the client can retry with the same one.
+- Keys are scoped per user.
 
 ## Money Handling
 
@@ -117,8 +140,8 @@ database, so it is deterministic, runs in parallel, and needs no Docker.
 - [x] Concurrency control (optimistic locking) for concurrent withdrawals
 - [x] Unit and integration tests (xUnit)
 - [x] PostgreSQL and Docker Compose
+- [x] Idempotency keys so a retried request cannot pay twice
 
 ## Roadmap
 
 - [ ] Audit log — immutable record of every operation
-- [ ] Idempotency keys so a retried request cannot pay twice

@@ -20,6 +20,8 @@ public class WalletDbContext : DbContext
 
     public DbSet<Transaction> Transactions => Set<Transaction>();
 
+    public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         // PostgreSQL DateTimeOffset'i (timestamptz) yerel olarak destekler; dönüşüm
@@ -103,6 +105,19 @@ public class WalletDbContext : DbContext
 
             // Hesap geçmişi tarih sırasına göre sorgulanır.
             transaction.HasIndex(t => new { t.AccountId, t.CreatedAt });
+        });
+
+        modelBuilder.Entity<IdempotencyRecord>(record =>
+        {
+            record.HasKey(r => r.Id);
+
+            record.Property(r => r.Key).IsRequired().HasMaxLength(128);
+            record.Property(r => r.Endpoint).IsRequired().HasMaxLength(256);
+            record.Property(r => r.RequestHash).IsRequired().HasMaxLength(64);
+
+            // Anahtarı sahibiyle birlikte benzersiz kılar. Aynı anda gelen iki
+            // istekten yalnızca biri kaydı oluşturabilir; yarışı veritabanı çözer.
+            record.HasIndex(r => new { r.UserId, r.Key }).IsUnique();
         });
     }
 

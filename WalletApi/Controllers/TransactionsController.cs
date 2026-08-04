@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using WalletApi.Contracts;
 using WalletApi.Domain;
 using WalletApi.Extensions;
+using WalletApi.Infrastructure;
 using WalletApi.Services;
 
 namespace WalletApi.Controllers;
@@ -21,6 +22,7 @@ public class TransactionsController : ControllerBase
 
     // POST /api/transactions/deposit
     [HttpPost("deposit")]
+    [ServiceFilter(typeof(IdempotencyFilter))]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<TransactionResponse>> Deposit(AmountRequest request, CancellationToken ct)
@@ -33,6 +35,7 @@ public class TransactionsController : ControllerBase
 
     // POST /api/transactions/withdraw
     [HttpPost("withdraw")]
+    [ServiceFilter(typeof(IdempotencyFilter))]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<TransactionResponse>> Withdraw(AmountRequest request, CancellationToken ct)
@@ -45,6 +48,7 @@ public class TransactionsController : ControllerBase
 
     // POST /api/transactions/transfer
     [HttpPost("transfer")]
+    [ServiceFilter(typeof(IdempotencyFilter))]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
@@ -57,6 +61,7 @@ public class TransactionsController : ControllerBase
     }
 
     // GET /api/transactions?take=50 — kendi hesabının işlem geçmişi.
+    // Okuma işlemi zaten yan etkisizdir; idempotency anahtarına gerek yok.
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<TransactionResponse>>> History(
