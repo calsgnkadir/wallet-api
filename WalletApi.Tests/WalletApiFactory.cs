@@ -44,7 +44,12 @@ public class WalletApiFactory : WebApplicationFactory<Program>
                 ["Jwt:ExpiryMinutes"] = "60",
 
                 // Teste özgü anahtar: gerçek gizli anahtar testlerde kullanılmaz.
-                ["Jwt:Key"] = "test-only-signing-key-that-is-long-enough-32"
+                ["Jwt:Key"] = "test-only-signing-key-that-is-long-enough-32",
+
+                // Diğer testler login/register'ı çok çağırır; rate limit'e
+                // takılmasınlar diye sınırı yükseğe alıyoruz. Rate limit davranışı
+                // kendi testinde, düşük bir sınırla ayrıca sınanır.
+                ["RateLimiting:Auth:PermitLimit"] = "100000"
             });
         });
 

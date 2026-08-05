@@ -121,6 +121,20 @@ curl -X POST http://localhost:8085/api/transactions/transfer \
 - A request that fails releases its key, so the client can retry with the same one.
 - Keys are scoped per user.
 
+## Rate Limiting
+
+`POST /api/auth/login` and `POST /api/auth/register` are rate limited per client IP —
+by default 10 requests per minute, configurable under `RateLimiting:Auth`. This blunts
+credential brute-forcing without affecting normal use.
+
+- The limiter runs before authentication, so a rejected request never reaches password
+  hashing.
+- Over the limit returns `429 Too Many Requests` with a `Retry-After` header.
+- Rejections are written to structured logs rather than the audit table, so a flood of
+  attempts cannot be used to amplify writes into the database.
+- Only the credential-accepting endpoints are limited; the money endpoints are already
+  behind a token and are left untouched.
+
 ## Money Handling
 
 - Balances and amounts use `decimal`, never `double`, so no cent is lost to binary
@@ -149,6 +163,7 @@ curl -X POST http://localhost:8085/api/transactions/transfer \
   layer or a committed file.
 - Failed logins are recorded with their IP address, and the audit trail cannot be
   rewritten from the application or from a direct database connection.
+- The login and registration endpoints are rate limited per IP to blunt brute-forcing.
 
 ## Current Status
 
@@ -164,4 +179,6 @@ curl -X POST http://localhost:8085/api/transactions/transfer \
 - [x] PostgreSQL and Docker Compose
 - [x] Idempotency keys so a retried request cannot pay twice
 - [x] Append-only audit trail with admin-only access
+- [x] Per-IP rate limiting on the authentication endpoints
+- [x] CI pipeline (GitHub Actions)
 

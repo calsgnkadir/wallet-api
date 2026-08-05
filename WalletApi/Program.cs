@@ -36,6 +36,9 @@ builder.Services.AddScoped<IdempotencyFilter>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IAuditLogger, AuditLogger>();
 
+// Kaba kuvvet (brute-force) korumasi: login/register'a IP basina deneme siniri.
+builder.Services.AddAuthRateLimiting();
+
 // JWT ayarları + token üreten servis.
 // İmzalama anahtarı yoksa uygulama hiç başlamasın: eksik yapılandırmayla
 // çalışan bir kimlik doğrulama, olmayandan daha tehlikelidir.
@@ -107,6 +110,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Kimlik doğrulamadan önce: reddedilen istek pahalı şifre doğrulamasına ulaşmasın.
+app.UseRateLimiter();
 
 // Sıra önemli: önce "kimsin?" (authentication), sonra "yetkin var mı?" (authorization).
 app.UseAuthentication();
