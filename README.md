@@ -1,5 +1,7 @@
 ﻿# WalletApi
 
+[![CI](https://github.com/calsgnkadir/wallet-api/actions/workflows/ci.yml/badge.svg)](https://github.com/calsgnkadir/wallet-api/actions/workflows/ci.yml)
+
 A secure digital wallet REST API built with ASP.NET Core — user accounts, balances,
 and money transfers with an emphasis on transactional integrity and auditability.
 
