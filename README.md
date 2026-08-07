@@ -73,13 +73,20 @@ The app refuses to start when the signing key is missing or shorter than 32 byte
 dotnet test
 ```
 
-56 tests, no external dependencies — the suite swaps PostgreSQL for an in-memory SQLite
+60 tests, no external dependencies — the suite swaps PostgreSQL for an in-memory SQLite
 database, so it is deterministic, runs in parallel, and needs no Docker.
 
 - **Service tests** cover the money rules directly: rounding, overdraft rejection,
   transfer atomicity, ledger-versus-balance consistency, and the concurrency guard.
 - **Endpoint tests** boot the whole application in memory and drive it over HTTP with
-  real JWTs, covering registration, login, authorization and the full transfer flow.
+  real JWTs, covering registration, login, authorization, transfers, idempotency,
+  the audit trail and rate limiting.
+
+## Design Decisions
+
+The reasoning behind the significant choices — money as `decimal`, optimistic
+concurrency, idempotency keys, the two-layer immutable audit log — is recorded as short
+[Architecture Decision Records](docs/adr/README.md).
 
 ## Audit Trail
 
